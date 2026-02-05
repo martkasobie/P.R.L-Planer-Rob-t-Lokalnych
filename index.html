@@ -443,9 +443,20 @@
         <div class="app-modal-window">
             <h3 class="font-bold text-xl mb-4 text-[#8c1c1c] uppercase border-b-2 border-gray-600 pb-2 font-['Oswald']">WEZWANIE / NOTATKA</h3>
             <p class="text-sm font-bold mb-2 font-mono">DATA: <span id="event-date-display" class="text-[#8c1c1c] text-lg"></span></p>
+            
             <label class="block text-[10px] uppercase font-bold mb-1 text-left">Treść zgłoszenia:</label>
-            <textarea id="event-input" class="w-full bg-white border-2 border-gray-600 p-2 font-mono mb-6 outline-none text-lg shadow-inner resize-none custom-scrollbar selectable-text" rows="6" placeholder="Np. Urodziny Partii"></textarea>
-            <div class="flex gap-2 mt-4">
+            <textarea id="event-input" class="w-full bg-white border-2 border-gray-600 p-2 font-mono mb-4 outline-none text-lg shadow-inner resize-none custom-scrollbar selectable-text" rows="4" placeholder="Np. Urodziny Partii"></textarea>
+            
+            <label class="block text-[10px] uppercase font-bold mb-1 text-left">Powtarzalność:</label>
+            <select id="event-recurrence" class="w-full bg-white border-2 border-gray-600 p-2 font-mono mb-6 outline-none text-sm shadow-inner cursor-pointer">
+                <option value="none">Nie powtarza się</option>
+                <option value="daily">Codziennie</option>
+                <option value="weekly">Co tydzień</option>
+                <option value="monthly">Co miesiąc</option>
+                <option value="yearly">Co rok</option>
+            </select>
+
+            <div class="flex gap-2">
                 <button onclick="deleteEvent()" id="btn-delete-event" class="px-3 py-2 border-2 border-[#8c1c1c] text-[#8c1c1c] font-bold uppercase hover:bg-red-100 hidden" title="Usuń"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
                 <button onclick="closeEventModal()" class="flex-1 px-2 py-2 border-2 border-[#2b2b2b] font-bold uppercase hover:bg-gray-300">Anuluj</button>
                 <button onclick="saveEvent()" class="flex-1 px-2 py-2 bg-[#8c1c1c] text-white font-bold uppercase hover:bg-[#631212]">Zapisz</button>
@@ -453,7 +464,6 @@
         </div>
     </div>
     
-    <!-- OKNO PODGLĄDU NOTATEK -->
     <div id="note-view-modal" class="app-modal-overlay">
         <div class="app-modal-window">
             <h3 class="font-bold text-xl mb-4 text-[#8c1c1c] uppercase border-b-2 border-gray-600 pb-2 font-['Oswald']">NOTATKA SŁUŻBOWA</h3>
@@ -746,7 +756,6 @@
             renderNotesList(); 
             
             const editor = document.getElementById('note-editor');
-            // Jeśli edytujemy starą notatkę, scratchpad powinien być wyłączony na rzecz notatki
             if(editor && state.scratchpad && !state.activeNoteId) { editor.value = state.scratchpad; }
 
             const radioManual = document.querySelector(`input[name="stampMode"][value="manual"]`);
@@ -950,34 +959,109 @@
         }
         
         function changeMonth(dir) { const d = state.viewDate || new Date(); d.setMonth(d.getMonth() + dir); state.viewDate = d; renderCalendar(); }
+        
+        // NOWA FUNKCJA DO POBIERANIA WYDARZENIA DLA KONKRETNEJ DATY (UWZGLĘDNIA REKURENCJĘ)
+        function getEventForDate(day, month, year) {
+            const current = new Date(year, month - 1, day);
+            
+            // Przeszukujemy zakotwiczone wydarzenia
+            for (let anchorKey in state.events) {
+                const event = state.events[anchorKey];
+                const [aD, aM, aY] = anchorKey.split('-').map(Number);
+                const anchor = new Date(aY, aM - 1, aD);
+
+                // Nie pokazujemy wydarzenia przed jego datą rozpoczęcia
+                if (current < anchor) continue;
+
+                const rec = event.recurrence || 'none';
+
+                if (rec === 'none') {
+                    if (day === aD && month === aM && year === aY) return { text: event.text, sourceKey: anchorKey };
+                } else if (rec === 'daily') {
+                    return { text: event.text, sourceKey: anchorKey };
+                } else if (rec === 'weekly') {
+                    if (current.getDay() === anchor.getDay()) return { text: event.text, sourceKey: anchorKey };
+                } else if (rec === 'monthly') {
+                    if (current.getDate() === anchor.getDate()) return { text: event.text, sourceKey: anchorKey };
+                } else if (rec === 'yearly') {
+                    if (current.getDate() === anchor.getDate() && current.getMonth() === anchor.getMonth()) return { text: event.text, sourceKey: anchorKey };
+                }
+            }
+            return null;
+        }
+
         function renderCalendar() {
             const grid = document.getElementById('calendar-grid'); if (!grid) return; grid.innerHTML = '';
             const d = state.viewDate || new Date(); const year = d.getFullYear(), month = d.getMonth();
             const months = ["STYCZEŃ", "LUTY", "MARZEC", "KWIECIEŃ", "MAJ", "CZERWIEC", "LIPIEC", "SIERPIEŃ", "WRZESIEŃ", "PAŹDZIERNIK", "LISTOPAD", "GRUDZIEŃ"];
             const monthLabel = document.getElementById('calendar-month-year'); if (monthLabel) monthLabel.innerText = `${months[month]} ${year}`;
             ['PN', 'WT', 'ŚR', 'CZ', 'PT', 'SB', 'ND'].forEach(txt => { const el = document.createElement('div'); el.className = "cal-header"; el.innerText = txt; grid.appendChild(el); });
+            
             const firstDay = new Date(year, month, 1).getDay(); const offset = firstDay === 0 ? 6 : firstDay - 1;
             const daysInMonth = new Date(year, month + 1, 0).getDate(); const today = new Date();
+            
             for(let i=0; i<offset; i++) grid.appendChild(Object.assign(document.createElement('div'), {className: "calendar-cell empty"}));
+            
             for(let i=1; i<=daysInMonth; i++) {
-                const key = `${i}-${month+1}-${year}`; const isToday = (i === today.getDate() && month === today.getMonth() && year === today.getFullYear());
-                const c = document.createElement('div'); c.className = `calendar-cell ${isToday ? 'today' : ''}`;
+                const eventData = getEventForDate(i, month + 1, year);
+                const isToday = (i === today.getDate() && month === today.getMonth() && year === today.getFullYear());
+                const c = document.createElement('div'); 
+                c.className = `calendar-cell ${isToday ? 'today' : ''}`;
+                
                 let html = `<span style="font-weight: bold; margin-left: 2px;">${i}</span>`;
-                if(state.events[key]) { c.classList.add('active'); html += `<div class="event-marker"></div><div class="cal-event-text selectable-text">${state.events[key]}</div>`; }
-                c.innerHTML = html; c.onclick = () => openEventModal(key); grid.appendChild(c);
+                if(eventData) { 
+                    c.classList.add('active'); 
+                    html += `<div class="event-marker"></div><div class="cal-event-text selectable-text">${eventData.text}</div>`; 
+                }
+                
+                c.innerHTML = html; 
+                // Kliknięcie w dowolną instancję otwiera edycję "źródła"
+                c.onclick = () => openEventModal(eventData ? eventData.sourceKey : `${i}-${month+1}-${year}`); 
+                grid.appendChild(c);
             }
         }
+
         function openEventModal(key) {
             currentEditingDateKey = key; const parts = key.split('-'); const months = ["Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec", "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"];
             const modal = document.getElementById('event-modal'); const delBtn = document.getElementById('btn-delete-event');
+            const recurrenceSelect = document.getElementById('event-recurrence');
+            
             document.getElementById('event-date-display').innerText = `${parts[0]} ${months[parseInt(parts[1])-1]} ${parts[2]}`;
-            document.getElementById('event-input').value = state.events[key] || "";
-            if (delBtn) delBtn.classList.toggle('hidden', !state.events[key]);
+            
+            const existingEvent = state.events[key];
+            if (existingEvent) {
+                document.getElementById('event-input').value = existingEvent.text || "";
+                recurrenceSelect.value = existingEvent.recurrence || "none";
+                if (delBtn) delBtn.classList.remove('hidden');
+            } else {
+                document.getElementById('event-input').value = "";
+                recurrenceSelect.value = "none";
+                if (delBtn) delBtn.classList.add('hidden');
+            }
+            
             if (modal) { modal.classList.add('active'); modal.style.display = 'flex'; }
         }
+
         function closeEventModal() { const m = document.getElementById('event-modal'); if (m) { m.classList.remove('active'); m.style.display = 'none'; } currentEditingDateKey = null; }
-        function saveEvent() { if(!currentEditingDateKey) return; const val = document.getElementById('event-input').value.trim(); if(val) state.events[currentEditingDateKey] = val; else delete state.events[currentEditingDateKey]; saveState(); renderCalendar(); closeEventModal(); }
-        function deleteEvent() { if(!currentEditingDateKey) return; showConfirm("Usunąć wydarzenie?", () => { delete state.events[currentEditingDateKey]; saveState(); renderCalendar(); closeEventModal(); }); }
+        
+        function saveEvent() { 
+            if(!currentEditingDateKey) return; 
+            const val = document.getElementById('event-input').value.trim(); 
+            const rec = document.getElementById('event-recurrence').value;
+
+            if(val) {
+                state.events[currentEditingDateKey] = {
+                    text: val,
+                    recurrence: rec
+                };
+            } else {
+                delete state.events[currentEditingDateKey];
+            }
+
+            saveState(); renderCalendar(); closeEventModal(); 
+        }
+
+        function deleteEvent() { if(!currentEditingDateKey) return; showConfirm("Usunąć całą serię wydarzeń?", () => { delete state.events[currentEditingDateKey]; saveState(); renderCalendar(); closeEventModal(); }); }
 
         function loadPhoto(input) { 
             if(input.files && input.files[0]) { 
@@ -1003,19 +1087,26 @@
             if (subject && desc && reason && fix) state.selfCriticism = { subject: subject.value, desc: desc.value, reason: reason.value, fix: fix.value };
             if (citizen) state.citizenName = citizen.value; 
             if (editor && !state.activeNoteId) state.scratchpad = editor.value; 
-            localStorage.setItem('prl_planer_v9', JSON.stringify(state)); 
+            localStorage.setItem('prl_planer_v10', JSON.stringify(state)); 
         }
 
         function loadState() { 
-            const s = localStorage.getItem('prl_planer_v9'); 
+            const s = localStorage.getItem('prl_planer_v10') || localStorage.getItem('prl_planer_v9'); 
             if(s) { 
                 const p = JSON.parse(s); state = { ...state, ...p }; 
                 if (!state.selectedStampIds) state.selectedStampIds = [2];
+                
+                // Konwersja starych wydarzeń (stringów) na obiekty z rekurencją
+                for (let k in state.events) {
+                    if (typeof state.events[k] === 'string') {
+                        state.events[k] = { text: state.events[k], recurrence: 'none' };
+                    }
+                }
+
                 if(state.photo) { document.getElementById('user-photo').src = state.photo; document.getElementById('user-photo').classList.remove('hidden'); document.getElementById('photo-placeholder').classList.add('hidden'); }
             } 
         }
 
-        // --- FUNKCJE NOTATNIKA ARCHIWALNEGO ---
         function renderNotesList() {
             const list = document.getElementById('notes-list'); if (!list) return; list.innerHTML = '';
             if (!state.notes || state.notes.length === 0) list.innerHTML = '<li class="text-center text-gray-500 italic p-2">Brak akt w archiwum.</li>';
@@ -1025,7 +1116,6 @@
                 list.appendChild(li);
             });
             
-            // UI Status Editora
             const status = document.getElementById('note-status');
             const cancelBtn = document.getElementById('btn-cancel-edit');
             if (state.activeNoteId) {
@@ -1086,7 +1176,7 @@
                 if (e) {
                     e.value = n.content;
                     state.activeNoteId = n.id;
-                    state.scratchpad = ""; // Brudnopis zostaje zawieszony na czas edycji
+                    state.scratchpad = ""; 
                     closeNoteViewModal();
                     renderNotesList();
                     e.focus();
