@@ -399,6 +399,13 @@
             color: #1a1a1a;
             font-weight: bold;
         }
+
+        .prl-editor:empty:before {
+            content: attr(placeholder);
+            color: #6b7280;
+            pointer-events: none;
+            display: block;
+        }
     </style>
 </head>
 <body class="flex flex-col items-center justify-start md:justify-center p-2 md:p-4 min-h-screen pb-24 md:pb-4">
@@ -567,18 +574,30 @@
                                 <span>ARCHIWUM</span>
                                 <button onclick="deleteMarkedNotes()" class="text-red-400 hover:text-red-300 transition uppercase" title="Usuń zaznaczone">USUŃ WYBRANE</button>
                             </div>
+                            <div class="p-1 border-b border-gray-500 bg-gray-200">
+                                <input type="text" id="note-search" oninput="renderNotesList()" placeholder="Szukaj (tytuł, data, #tag)..." class="w-full bg-white border border-gray-400 p-1 text-xs font-mono outline-none">
+                            </div>
                             <ul id="notes-list" class="flex-1 overflow-y-auto overflow-x-hidden p-1 custom-scrollbar text-xs font-mono space-y-1">
                                 <li class="text-center text-gray-500 italic p-2">Brak akt w archiwum.</li>
                             </ul>
                         </div>
                         <div class="w-full md:w-2/3 border border-gray-500 bg-[#f3f4f6] relative flex flex-col shadow-[2px_2px_5px_rgba(0,0,0,0.2)] h-60 md:h-full" style="transform: rotate(0.5deg);">
                              <div class="absolute inset-0 pointer-events-none opacity-5" style="background-image: repeating-linear-gradient(transparent, transparent 19px, #000 20px);"></div>
-                             <textarea id="note-editor" class="flex-1 bg-transparent p-4 resize-none outline-none font-['Courier_Prime'] text-sm leading-[20px] text-[#1a1a1a] z-10 custom-scrollbar selectable-text overflow-x-hidden" placeholder="Miejsce na notatki służbowe, obserwacje i wnioski..."></textarea>
-                             <div class="border-t border-gray-400 p-2 flex justify-between items-center bg-gray-200/80 z-10">
-                                <span id="note-status" class="text-[9px] text-gray-500 uppercase">Wpisz i Zapisz</span>
-                                <div class="flex gap-1">
-                                    <button id="btn-cancel-edit" onclick="clearEditor()" class="hidden bg-gray-500 text-white border border-[#333] px-2 py-1 text-xs font-bold uppercase hover:bg-gray-600 transition shadow-sm">Anuluj Poprawki</button>
-                                    <button onclick="saveCurrentNote()" class="bg-[#8c1c1c] text-white border border-[#3d0808] px-4 py-1 text-xs font-bold uppercase hover:bg-[#631212] transition shadow-sm">ZAPISZ DO AKT</button>
+                             <div class="p-2 border-b border-gray-400 bg-gray-200/80 z-10 flex flex-col gap-1">
+                                <input type="text" id="note-title-input" placeholder="NAGŁÓWEK" class="bg-transparent border-b border-gray-400 border-dashed outline-none font-bold font-['Courier_Prime'] text-sm text-[#8c1c1c] placeholder-gray-500">
+                                <input type="text" id="note-tags-input" placeholder="TAGI (np. #plan #ważne)..." class="bg-transparent border-none outline-none font-['Courier_Prime'] text-xs text-[#103090] placeholder-gray-500">
+                             </div>
+                             <div id="note-editor" contenteditable="true" oninput="saveState();" class="flex-1 bg-transparent p-4 outline-none font-['Courier_Prime'] text-sm leading-[20px] text-[#1a1a1a] z-10 custom-scrollbar prl-editor overflow-y-auto" placeholder="Miejsce na notatki służbowe, obserwacje i wnioski..."></div>
+                             <div class="border-t border-gray-400 p-2 flex flex-wrap justify-end items-center bg-gray-200/80 z-10 gap-2">
+                                <div class="flex flex-wrap items-center gap-2 justify-end flex-grow">
+                                    <div class="flex items-center shadow-[1px_1px_0px_#444]">
+                                        <button onclick="markRed()" class="text-[10px] sm:text-xs font-bold bg-[#8c1c1c] text-white px-2 py-1.5 sm:py-1 border border-[#444] border-r-0 transition hover:bg-[#631212] active:translate-y-[1px] text-center" title="Zaznacz wybrany tekst na czerwono">ZAZNACZ</button>
+                                        <button onclick="unmarkRed()" class="text-[10px] sm:text-xs font-bold bg-white text-[#1a1a1a] px-2 py-1.5 sm:py-1 border border-[#444] transition hover:bg-gray-200 active:translate-y-[1px] text-center" title="Usuń czerwone zaznaczenie z tekstu">ODZNACZ</button>
+                                    </div>
+                                    <div class="flex gap-1">
+                                        <button id="btn-cancel-edit" onclick="clearEditor()" class="hidden bg-gray-500 text-white border border-[#333] px-3 py-1.5 sm:py-1 text-[10px] sm:text-xs font-bold uppercase hover:bg-gray-600 transition shadow-sm whitespace-nowrap text-center">Anuluj</button>
+                                        <button onclick="saveCurrentNote()" class="bg-[#8c1c1c] text-white border border-[#3d0808] px-3 py-1.5 sm:py-1 text-[10px] sm:text-xs font-bold uppercase hover:bg-[#631212] transition shadow-sm whitespace-nowrap text-center">ZAPISZ DO AKT</button>
+                                    </div>
                                 </div>
                              </div>
                         </div>
@@ -678,7 +697,7 @@
             unlockedStamps: [], selectedStampIds: [2], stampSelectionMode: 'manual', 
             selfCriticism: { subject: 'lenistwo', desc: '', reason: '', fix: '' }, 
             viewDate: null, currentGoal: null, citizenName: "Jan Kowalski", 
-            notes: [], activeNoteId: null, scratchpad: "" 
+            notes: [], activeNoteId: null, scratchpad: "", scratchpadTitle: "", scratchpadTags: "" 
         };
         let currentEditingDateKey = null, currentQuoteIndex = 0, viewingNoteId = null;
 
@@ -702,7 +721,13 @@
             loadState(); state.viewDate = new Date(); initQuote(); renderDate(); setInterval(renderDate, 60000);
             renderTasks(); renderPlans(); renderCalendar(); renderStampsGallery(); renderSelfCriticismHistory(); renderNotesList(); 
             const editor = document.getElementById('note-editor');
-            if(editor && state.scratchpad && !state.activeNoteId) { editor.value = state.scratchpad; }
+            const titleInput = document.getElementById('note-title-input');
+            const tagsInput = document.getElementById('note-tags-input');
+            if(editor && !state.activeNoteId) { 
+                editor.innerHTML = state.scratchpad || ""; 
+                if (titleInput) titleInput.value = state.scratchpadTitle || "";
+                if (tagsInput) tagsInput.value = state.scratchpadTags || "";
+            }
             const radioManual = document.querySelector(`input[name="stampMode"][value="manual"]`);
             const radioRandom = document.querySelector(`input[name="stampMode"][value="random"]`);
             if (state.stampSelectionMode === 'random') { if (radioRandom) radioRandom.checked = true; } else { if (radioManual) radioManual.checked = true; }
@@ -724,6 +749,8 @@
                 editor.addEventListener('input', saveState);
                 editor.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveCurrentNote(); } });
             }
+            if (titleInput) titleInput.addEventListener('input', saveState);
+            if (tagsInput) tagsInput.addEventListener('input', saveState);
             const taskInput = document.getElementById('task-input');
             if (taskInput) taskInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') addTask(); });
         }
@@ -916,9 +943,14 @@
         }
 
         function saveState() { 
-            const subject = document.getElementById('sc-subject'), desc = document.getElementById('sc-desc'), reason = document.getElementById('sc-reason'), fix = document.getElementById('sc-fix'), citizen = document.getElementById('citizen-name'), editor = document.getElementById('note-editor');
+            const subject = document.getElementById('sc-subject'), desc = document.getElementById('sc-desc'), reason = document.getElementById('sc-reason'), fix = document.getElementById('sc-fix'), citizen = document.getElementById('citizen-name'), editor = document.getElementById('note-editor'), titleInput = document.getElementById('note-title-input'), tagsInput = document.getElementById('note-tags-input');
             if (subject && desc && reason && fix) state.selfCriticism = { subject: subject.value, desc: desc.value, reason: reason.value, fix: fix.value };
-            if (citizen) state.citizenName = citizen.value; if (editor && !state.activeNoteId) state.scratchpad = editor.value; 
+            if (citizen) state.citizenName = citizen.value; 
+            if (editor && !state.activeNoteId) {
+                state.scratchpad = editor.innerHTML; 
+                state.scratchpadTitle = titleInput ? titleInput.value : "";
+                state.scratchpadTags = tagsInput ? tagsInput.value : "";
+            }
             localStorage.setItem('prl_planer_v10', JSON.stringify(state)); 
         }
 
@@ -929,36 +961,184 @@
 
         function renderNotesList() {
             const list = document.getElementById('notes-list'); if (!list) return; list.innerHTML = '';
-            if (!state.notes || state.notes.length === 0) list.innerHTML = '<li class="text-center text-gray-500 italic p-2">Brak akt w archiwum.</li>';
-            else state.notes.forEach(n => {
+            const searchInput = document.getElementById('note-search');
+            const term = searchInput ? searchInput.value.toLowerCase().trim() : "";
+            
+            let filteredNotes = state.notes;
+            if (term) {
+                filteredNotes = state.notes.filter(n => 
+                    (n.title && n.title.toLowerCase().includes(term)) || 
+                    (n.content && n.content.toLowerCase().includes(term)) || 
+                    (n.tags && n.tags.toLowerCase().includes(term)) || 
+                    (n.date && n.date.toLowerCase().includes(term))
+                );
+            }
+
+            if (!filteredNotes || filteredNotes.length === 0) list.innerHTML = '<li class="text-center text-gray-500 italic p-2">Brak akt w archiwum.</li>';
+            else filteredNotes.forEach(n => {
                 const li = document.createElement('li'); li.className = `archive-item flex items-center gap-2 ${state.activeNoteId === n.id ? 'active' : ''}`;
-                li.innerHTML = `<input type="checkbox" class="note-checkbox cursor-pointer accent-[#8c1c1c]" value="${n.id}" onclick="event.stopPropagation()"><span class="truncate flex-1" onclick="selectNote(${n.id})">${n.date} - ${n.title || 'Bez tytułu'}</span>`;
+                li.innerHTML = `<input type="checkbox" class="note-checkbox cursor-pointer accent-[#8c1c1c]" value="${n.id}" onclick="event.stopPropagation()">
+                                <div class="truncate flex-1 cursor-pointer" onclick="selectNote(${n.id})">
+                                    <div class="font-bold text-[#8c1c1c]">${n.title || 'Bez tytułu'}</div>
+                                    <div class="text-[9px] text-gray-600 mt-0.5">${n.date} ${n.tags ? `<span class="text-[#103090] font-bold ml-1">${n.tags}</span>` : ''}</div>
+                                </div>`;
                 list.appendChild(li);
             });
-            document.getElementById('note-status').innerText = state.activeNoteId ? "POPRAWIANIE AKT" : "Wpisz i Zapisz";
             document.getElementById('btn-cancel-edit').classList.toggle('hidden', !state.activeNoteId);
         }
         
-        function clearEditor() { state.activeNoteId = null; const e = document.getElementById('note-editor'); if(e) e.value = state.scratchpad || ''; saveState(); renderNotesList(); }
+        function clearEditor() { 
+            state.activeNoteId = null; 
+            const e = document.getElementById('note-editor'); 
+            const titleInput = document.getElementById('note-title-input');
+            const tagsInput = document.getElementById('note-tags-input');
+            if(e) { e.innerHTML = state.scratchpad || ''; } 
+            if(titleInput) titleInput.value = state.scratchpadTitle || ''; 
+            if(tagsInput) tagsInput.value = state.scratchpadTags || ''; 
+            saveState(); renderNotesList(); 
+        }
 
         function saveCurrentNote() {
-            const e = document.getElementById('note-editor'); if (!e) return; const c = e.value.trim(); if (!c) { showAlert("Obywatelu! Pustych akt nie archiwizujemy."); return; }
-            const t = c.split('\n')[0].substring(0, 20) + (c.length > 20 ? '...' : ''); const d = new Date().toLocaleDateString('pl-PL');
-            if (state.activeNoteId) { const i = state.notes.findIndex(n => n.id === state.activeNoteId); if (i !== -1) { state.notes[i].content = c; state.notes[i].title = t; } showAlert("Aktualizacja akt zakończona pomyślnie."); }
-            else { state.notes.unshift({ id: Date.now(), title: t, content: c, date: d }); showAlert("Notatka przekazana do archiwum."); }
-            e.value = ''; state.scratchpad = ""; state.activeNoteId = null; saveState(); renderNotesList();
+            const e = document.getElementById('note-editor'); 
+            const titleInput = document.getElementById('note-title-input');
+            const tagsInput = document.getElementById('note-tags-input');
+            if (!e) return; 
+            const c = e.innerHTML.trim(); 
+            const plainText = e.innerText.trim();
+            const customTitle = titleInput ? titleInput.value.trim() : "";
+            const tags = tagsInput ? tagsInput.value.trim() : "";
+
+            if (!plainText && !customTitle) { showAlert("Obywatelu! Pustych akt nie archiwizujemy."); return; }
+            
+            const t = customTitle || plainText.split('\n')[0].substring(0, 20) + (plainText.length > 20 ? '...' : ''); 
+            
+            const dObj = new Date();
+            const days = ['Niedziela', 'Poniedziałek', 'Wtorek', 'Środa', 'Czwartek', 'Piątek', 'Sobota'];
+            const d = `${dObj.getFullYear()}-${String(dObj.getMonth()+1).padStart(2,'0')}-${String(dObj.getDate()).padStart(2,'0')} | [${days[dObj.getDay()]}]`;
+
+            if (state.activeNoteId) { 
+                const i = state.notes.findIndex(n => n.id === state.activeNoteId); 
+                if (i !== -1) { state.notes[i].content = c; state.notes[i].title = t; state.notes[i].tags = tags; } 
+                showAlert("Aktualizacja akt zakończona pomyślnie."); 
+            }
+            else { 
+                state.notes.unshift({ id: Date.now(), title: t, content: c, date: d, tags: tags }); 
+                showAlert("Notatka przekazana do archiwum."); 
+            }
+            e.innerHTML = ''; if(titleInput) titleInput.value = ''; if(tagsInput) tagsInput.value = '';
+            state.scratchpad = ""; state.scratchpadTitle = ""; state.scratchpadTags = "";
+            state.activeNoteId = null; saveState(); renderNotesList();
         }
 
         function selectNote(id) {
             const n = state.notes.find(x => x.id === id); if (!n) return; viewingNoteId = id;
-            document.getElementById('note-view-date').innerText = `${n.date} - ${n.title || 'Dokument'}`;
-            document.getElementById('note-view-content').innerText = n.content;
+            document.getElementById('note-view-date').innerHTML = `${n.date} <br><span class="text-[#8c1c1c] uppercase">${n.title || 'Dokument'}</span> ${n.tags ? `<span class="text-[#103090] ml-2 font-normal">${n.tags}</span>` : ''}`;
+            document.getElementById('note-view-content').innerHTML = n.content;
             const m = document.getElementById('note-view-modal'); m.classList.add('active'); m.style.display = 'flex';
         }
 
         function editArchivedNote() {
             if (!viewingNoteId) return; const n = state.notes.find(x => x.id === viewingNoteId);
-            if (n) { const e = document.getElementById('note-editor'); if (e) { e.value = n.content; state.activeNoteId = n.id; state.scratchpad = ""; closeNoteViewModal(); renderNotesList(); e.focus(); } }
+            if (n) { 
+                const e = document.getElementById('note-editor'); 
+                const titleInput = document.getElementById('note-title-input');
+                const tagsInput = document.getElementById('note-tags-input');
+                if (e) { 
+                    e.innerHTML = n.content; 
+                    if(titleInput) titleInput.value = n.title || "";
+                    if(tagsInput) tagsInput.value = n.tags || "";
+                    state.activeNoteId = n.id; 
+                    state.scratchpad = ""; state.scratchpadTitle = ""; state.scratchpadTags = "";
+                    closeNoteViewModal(); renderNotesList(); e.focus(); 
+                } 
+            }
+        }
+
+        function markRed() {
+            const editor = document.getElementById('note-editor');
+            if (!editor) return;
+            editor.focus();
+            
+            const selection = window.getSelection();
+            if (!selection.rangeCount || selection.isCollapsed) return showAlert("Obywatelu! Najpierw zaznacz tekst do podkreślenia.");
+
+            const range = selection.getRangeAt(0);
+            let node = range.commonAncestorContainer;
+            if (node.nodeType === 3) node = node.parentNode;
+
+            // Blokada przed podwójnym zaznaczaniem tego samego fragmentu
+            let curr = node;
+            while (curr && curr.id !== 'note-editor' && curr !== document.body) {
+                if (curr.classList && (curr.classList.contains('marker-red') || curr.classList.contains('bg-[#fca5a5]'))) {
+                    return; // Już jest zaznaczone
+                }
+                curr = curr.parentNode;
+            }
+
+            const container = document.createElement('div');
+            container.appendChild(range.cloneContents());
+            const innerMarkers = container.querySelectorAll('.marker-red, span.bg-\\[\\#fca5a5\\]');
+
+            // Usuwamy tagi ze środka zaznaczenia by zapobiec psuciu się kodu
+            if (innerMarkers.length > 0) {
+                innerMarkers.forEach(m => {
+                    const frag = document.createDocumentFragment();
+                    while (m.firstChild) frag.appendChild(m.firstChild);
+                    m.parentNode.replaceChild(frag, m);
+                });
+            }
+
+            const newHtml = `<span class="marker-red bg-[#fca5a5] text-[#8c1c1c] font-bold rounded-sm px-1">${container.innerHTML}</span>&#8203;`;
+            document.execCommand('insertHTML', false, newHtml);
+            document.execCommand('removeFormat', false, null);
+            saveState();
+        }
+
+        function unmarkRed() {
+            const editor = document.getElementById('note-editor');
+            if (!editor) return;
+            editor.focus();
+            
+            const selection = window.getSelection();
+            if (!selection.rangeCount || selection.isCollapsed) return showAlert("Obywatelu! Najpierw zaznacz tekst do odznaczenia.");
+
+            const range = selection.getRangeAt(0);
+            let node = range.commonAncestorContainer;
+            if (node.nodeType === 3) node = node.parentNode;
+
+            // Cofanie jeśli kliknięto wewnątrz już istniejącego markera
+            let curr = node;
+            let parentMarker = null;
+            while (curr && curr.id !== 'note-editor' && curr !== document.body) {
+                if (curr.classList && (curr.classList.contains('marker-red') || curr.classList.contains('bg-[#fca5a5]'))) {
+                    parentMarker = curr;
+                    break;
+                }
+                curr = curr.parentNode;
+            }
+
+            if (parentMarker) {
+                const frag = document.createDocumentFragment();
+                while (parentMarker.firstChild) frag.appendChild(parentMarker.firstChild);
+                parentMarker.parentNode.replaceChild(frag, parentMarker);
+                saveState();
+                return;
+            }
+
+            // Cofanie z szerokiego obszaru obejmującego markery
+            const container = document.createElement('div');
+            container.appendChild(range.cloneContents());
+            const innerMarkers = container.querySelectorAll('.marker-red, span.bg-\\[\\#fca5a5\\]');
+
+            if (innerMarkers.length > 0) {
+                innerMarkers.forEach(m => {
+                    const frag = document.createDocumentFragment();
+                    while (m.firstChild) frag.appendChild(m.firstChild);
+                    m.parentNode.replaceChild(frag, m);
+                });
+                document.execCommand('insertHTML', false, container.innerHTML);
+                saveState();
+            }
         }
 
         function closeNoteViewModal() { const m = document.getElementById('note-view-modal'); if (m) { m.classList.remove('active'); m.style.display = 'none'; } viewingNoteId = null; }
