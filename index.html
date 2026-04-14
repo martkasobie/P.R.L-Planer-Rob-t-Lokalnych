@@ -492,12 +492,10 @@
             let removed = false;
 
             // Sprytny detektor - wyłapuje nasze klasy, ale też style, które złośliwie wstawia Chrome
-            const isHighlightNode = (n) => {
+            const isBadNode = (n) => {
                 if (n.nodeType !== 1) return false;
-                if (n.classList && n.classList.contains('marked')) return true;
-                if (n.style && (n.style.backgroundColor || n.style.background)) return true; // przeglądarka podmieniła klasę na styl po kasowaniu!
-                if (n.tagName === 'FONT') return true; // stara złośliwość
-                return false;
+                const t = n.tagName.toUpperCase();
+                return (t === 'SPAN' || t === 'B' || t === 'STRONG' || t === 'FONT' || t === 'I' || t === 'U' || t === 'MARK');
             };
 
             // Maszyna do usuwania otoczki
@@ -514,11 +512,15 @@
             // Krok 1: Szerokie zaznaczenie (jeśli obywatel przeciągnął palcem po kilku słowach)
             if (!sel.isCollapsed) {
                 const range = sel.getRangeAt(0);
-                editor.querySelectorAll('*').forEach(el => {
-                    if (isHighlightNode(el) && (sel.containsNode(el, true) || range.intersectsNode(el))) {
+                const elements = Array.from(editor.querySelectorAll('*'));
+                elements.forEach(el => {
+                    if (isBadNode(el) && (sel.containsNode(el, true) || range.intersectsNode(el))) {
                         unwrap(el);
                     }
                 });
+                // Siłowe uderzenie natywnym mechanizmem systemu!
+                document.execCommand('removeFormat', false, null);
+                removed = true; // Zawsze traktuj jako sukces, bo mogło usunąć natywny format
             }
 
             // Krok 2: Szukanie w górę (działa punktowo, gdy obywatel tylko kliknął w wyraz)
@@ -531,25 +533,18 @@
             
             while (node && node !== editor) {
                 let nextNode = node.parentNode;
-                if (isHighlightNode(node)) {
+                if (isBadNode(node)) {
                     unwrap(node);
                 }
                 node = nextNode;
             }
 
-            // Krok 3: Eksterminacja niewidzialnych pustych śmieci pozostawionych przez klawisz Backspace
-            editor.querySelectorAll('.marked, [style*="background"], font').forEach(s => {
-                if (s.textContent.trim() === '') {
+            // Krok 3: Eksterminacja niewidzialnych pustych śmieci pozostawionych przez Backspace
+            editor.querySelectorAll('*').forEach(s => {
+                if (isBadNode(s) && s.textContent.trim() === '') {
                     s.remove();
-                    removed = true;
                 }
             });
-
-            // Krok 4: Siłowe uderzenie natywnym mechanizmem systemu
-            if (!sel.isCollapsed) {
-                document.execCommand('hiliteColor', false, 'transparent');
-                document.execCommand('backColor', false, 'transparent');
-            }
 
             // Raport do centrali
             if (removed || !sel.isCollapsed) {
