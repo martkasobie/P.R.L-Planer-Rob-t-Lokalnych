@@ -1,4 +1,4 @@
-const CACHE_NAME = 'prl-planer-v3';
+const CACHE_NAME = 'prl-planer-v4';
 
 const ASSETS_TO_CACHE = [
   './',
