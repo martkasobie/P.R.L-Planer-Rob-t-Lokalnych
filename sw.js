@@ -1,4 +1,4 @@
-const CACHE_NAME = 'prl-planer-v2'; // Zmieniłem wersję na v2, aby wymusić odświeżenie
+const CACHE_NAME = 'prl-planer-v3';
 
 const ASSETS_TO_CACHE = [
   './',
@@ -30,7 +30,7 @@ const ASSETS_TO_CACHE = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('Obywatelu! Archiwizuję ikonę i pieczątki w pamięci urządzenia...');
+      console.log('Obywatelu! Archiwizuję nowe akta, ikonę i pieczątki w pamięci urządzenia...');
       return cache.addAll(ASSETS_TO_CACHE);
     })
   );
@@ -43,6 +43,7 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
+            console.log('Niszczenie starych akt z bufora:', cacheName);
             return caches.delete(cacheName);
           }
         })
@@ -54,8 +55,19 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   event.respondWith(
-    caches.match(event.request).then((response) => {
-      return response || fetch(event.request);
+    caches.match(event.request).then((cachedResponse) => {
+      const fetchPromise = fetch(event.request).then((networkResponse) => {
+        caches.open(CACHE_NAME).then((cache) => {
+          if (event.request.url.startsWith('http')) {
+            cache.put(event.request, networkResponse.clone());
+          }
+        });
+        return networkResponse;
+      }).catch(() => {
+        // Zignoruj błędy sieci w trybie offline
+      });
+      
+      return cachedResponse || fetchPromise;
     })
   );
 });
