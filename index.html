@@ -480,6 +480,7 @@
             try { span.appendChild(r.extractContents()); r.insertNode(span); const z = document.createTextNode('\u200B'); span.after(z); const nr = document.createRange(); nr.setStartAfter(z); nr.collapse(true); sel.removeAllRanges(); sel.addRange(nr); e.focus(); scheduleSave(); } catch (err) { console.error(err); }
         }
         
+        // NOWY, ODPORNY NA BŁĘDY MECHANIZM CZYSZCZENIA ZAKREŚLEŃ
         function forceCleanEditor() {
             const sel = window.getSelection();
             if (!sel.rangeCount) return showAlert("Obywatelu! Najpierw kliknij na zakreślony tekst.");
@@ -487,34 +488,53 @@
             const editor = document.getElementById('note-editor');
             if (!editor.contains(sel.anchorNode)) return;
 
-            let node = sel.anchorNode;
             let removed = false;
-
-            while (node && node !== editor) {
-                if (node.nodeType === 1 && node.classList.contains('marked')) {
-                    const parent = node.parentNode;
-                    while (node.firstChild) parent.insertBefore(node.firstChild, node);
-                    parent.removeChild(node);
-                    removed = true;
-                    break;
-                }
-                node = node.parentNode;
+            let node = sel.anchorNode;
+            
+            // Poprawka dla Safari/Chrome, gdzie selekcja potrafi zatrzymać się na samym divie głównym
+            if (node === editor && editor.childNodes[sel.anchorOffset]) {
+                node = editor.childNodes[sel.anchorOffset];
             }
 
-            if (!removed && !sel.isCollapsed) {
+            // Krok 1: Przeszukujemy węzły w górę (idealne dla pojedynczych wyrazów lub zagnieżdżonych uszkodzeń)
+            while (node && node !== editor) {
+                let nextNode = node.parentNode; // Zapamiętujemy rodzica ZANIM go zburzymy
+                if (node.nodeType === 1 && node.classList && node.classList.contains('marked')) {
+                    while (node.firstChild) {
+                        nextNode.insertBefore(node.firstChild, node);
+                    }
+                    nextNode.removeChild(node);
+                    removed = true;
+                }
+                node = nextNode;
+            }
+
+            // Krok 2: Usuwanie "szerokie" jeśli zaznaczono więcej tekstu naraz
+            if (!sel.isCollapsed) {
                 const spans = editor.querySelectorAll('span.marked');
                 spans.forEach(span => {
                     if (sel.containsNode(span, true)) {
                         const parent = span.parentNode;
-                        while (span.firstChild) parent.insertBefore(span.firstChild, span);
-                        parent.removeChild(span);
-                        removed = true;
+                        if (parent) { // Upewniamy się, że inny krok nie zdążył go już zniszczyć
+                            while (span.firstChild) {
+                                parent.insertBefore(span.firstChild, span);
+                            }
+                            parent.removeChild(span);
+                            removed = true;
+                        }
                     }
                 });
             }
 
+            // Krok 3: Sprzątanie po uszkodzonych / pustych strukturach (to one powodowały błąd)
+            const emptySpans = editor.querySelectorAll('span.marked:empty');
+            emptySpans.forEach(s => {
+                s.remove();
+                removed = true;
+            });
+
             if (removed) {
-                editor.normalize();
+                editor.normalize(); // Skleja z powrotem rozbite fragmenty tekstu
                 scheduleSave();
             } else {
                 showAlert("Obywatelu! W tym miejscu nie ma przydzielonego zakreślacza.");
