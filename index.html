@@ -346,7 +346,7 @@
                                 <input type="text" id="note-title-input" placeholder="NAGŁÓWEK" class="bg-transparent border-b border-gray-400 border-dashed outline-none font-bold font-['Courier_Prime'] text-sm text-[#8c1c1c] placeholder-gray-500">
                                 <input type="text" id="note-tags-input" placeholder="TAGI (np. #plan #ważne)..." class="bg-transparent border-none outline-none font-['Courier_Prime'] text-xs text-[#103090] placeholder-gray-500">
                              </div>
-                             <div id="note-editor" contenteditable="true" oninput="saveState();" onkeyup="sanitizeEditor(this);" class="flex-1 bg-transparent p-4 outline-none font-['Courier_Prime'] text-sm leading-[20px] text-[#1a1a1a] z-10 custom-scrollbar prl-editor overflow-y-auto" placeholder="Miejsce na notatki służbowe, obserwacje i wnioski..."></div>
+                             <div id="note-editor" contenteditable="true" oninput="scheduleSave();" onkeyup="sanitizeEditor(this);" class="flex-1 bg-transparent p-4 outline-none font-['Courier_Prime'] text-sm leading-[20px] text-[#1a1a1a] z-10 custom-scrollbar prl-editor overflow-y-auto" placeholder="Miejsce na notatki służbowe, obserwacje i wnioski..."></div>
                              <div class="border-t border-gray-400 p-2 flex flex-wrap justify-end items-center bg-gray-200/80 z-10 gap-2">
                                 <div class="flex flex-wrap items-center gap-2 justify-end flex-grow">
                                     <div class="flex items-center shadow-[1px_1px_0px_#444]"><button onclick="applyZakreslacz()" class="text-[10px] sm:text-xs font-bold bg-[#8c1c1c] text-white px-2 py-1.5 sm:py-1 border border-[#444] border-r-0 hover:bg-[#631212] transition uppercase">Zaznacz</button><button onclick="forceCleanEditor()" class="text-[10px] sm:text-xs font-bold bg-white text-[#1a1a1a] px-2 py-1.5 sm:py-1 border border-[#444] hover:bg-gray-200 transition uppercase">Odznacz</button></div>
@@ -378,7 +378,6 @@
     </div>
 
     <script>
-        // --- REJESTRACJA SERVICE WORKERA (TRYB OFFLINE) ---
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js')
@@ -407,7 +406,6 @@
             }
         }
 
-        // --- APLIKACJA ---
         let confirmCallback = null;
         function showAlert(text) { document.getElementById('alert-text').innerText = text; document.getElementById('alert-modal').classList.add('active'); }
         function closeAlert() { document.getElementById('alert-modal').classList.remove('active'); }
@@ -441,6 +439,12 @@
         let state = { tasks: [], plans: [], reports: [], events: {}, credits: 0, unlockedStamps: [], selectedStampIds: [2], stampSelectionMode: 'manual', selfCriticism: { subject: 'lenistwo', desc: '', reason: '', fix: '' }, viewDate: null, citizenName: "Jan Kowalski", notes: [], activeNoteId: null, scratchpad: "", scratchpadTitle: "", scratchpadTags: "" };
         let currentEditingDateKey = null, currentQuoteIndex = 0;
 
+        let saveTimeout;
+        function scheduleSave() {
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(saveState, 500);
+        }
+
         window.onload = function() { initSplashScreen(); init(); };
         function initSplashScreen() {
             const bar = document.getElementById('splash-progress'), status = document.getElementById('splash-status'), loading = document.getElementById('loading-container'), start = document.getElementById('start-container');
@@ -459,10 +463,12 @@
             const rm = document.querySelector(`input[name="stampMode"][value="manual"]`), rr = document.querySelector(`input[name="stampMode"][value="random"]`);
             if (state.stampSelectionMode === 'random') { if (rr) rr.checked = true; } else { if (rm) rm.checked = true; }
             const cn = document.getElementById('citizen-name'); if (cn && state.citizenName) cn.value = state.citizenName;
-            ['sc-subject', 'sc-desc', 'sc-reason', 'sc-fix'].forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('input', saveState); });
-            if (cn) cn.addEventListener('input', saveState);
-            if (e) { e.addEventListener('input', saveState); e.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); saveCurrentNote(); } }); }
-            if (t) t.addEventListener('input', saveState); if (tg) tg.addEventListener('input', saveState);
+            
+            ['sc-subject', 'sc-desc', 'sc-reason', 'sc-fix'].forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('input', scheduleSave); });
+            if (cn) cn.addEventListener('input', scheduleSave);
+            if (e) { e.addEventListener('input', scheduleSave); e.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); saveCurrentNote(); } }); }
+            if (t) t.addEventListener('input', scheduleSave); if (tg) tg.addEventListener('input', scheduleSave);
+            
             const ti = document.getElementById('task-input'); if (ti) ti.addEventListener('keypress', (ev) => { if(ev.key === 'Enter') addTask(); });
         }
         function sanitizeEditor(e) { if (e.innerText.trim() === "" && e.querySelectorAll('img').length === 0) e.innerHTML = '<div><br></div>'; const s = e.querySelectorAll('span:empty'); s.forEach(x => x.remove()); }
@@ -471,9 +477,9 @@
             if (!sel.rangeCount || sel.isCollapsed) return showAlert("Obywatelu! Najpierw zaznacz tekst myszką.");
             const r = sel.getRangeAt(0); if (!e.contains(r.commonAncestorContainer)) return;
             const span = document.createElement('span'); span.className = 'marked';
-            try { span.appendChild(r.extractContents()); r.insertNode(span); const z = document.createTextNode('\u200B'); span.after(z); const nr = document.createRange(); nr.setStartAfter(z); nr.collapse(true); sel.removeAllRanges(); sel.addRange(nr); e.focus(); saveState(); } catch (err) { console.error(err); }
+            try { span.appendChild(r.extractContents()); r.insertNode(span); const z = document.createTextNode('\u200B'); span.after(z); const nr = document.createRange(); nr.setStartAfter(z); nr.collapse(true); sel.removeAllRanges(); sel.addRange(nr); e.focus(); scheduleSave(); } catch (err) { console.error(err); }
         }
-        function forceCleanEditor() { const e = document.getElementById('note-editor'), p = e.innerText; e.innerHTML = p.trim() === '' ? '<div><br></div>' : p; saveState(); }
+        function forceCleanEditor() { const e = document.getElementById('note-editor'), p = e.innerText; e.innerHTML = p.trim() === '' ? '<div><br></div>' : p; scheduleSave(); }
         function viewNoteInternal(id) {
             const n = state.notes.find(x => x.id === id); if (!n) return;
             document.getElementById('viewer-date').innerText = n.date; document.getElementById('viewer-title').innerText = n.title || 'NOTATKA SŁUŻBOWA';
@@ -631,4 +637,4 @@
         }
     </script>
 </body>
-</html>        
+</html>
