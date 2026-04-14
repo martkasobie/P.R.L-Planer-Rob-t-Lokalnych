@@ -479,7 +479,48 @@
             const span = document.createElement('span'); span.className = 'marked';
             try { span.appendChild(r.extractContents()); r.insertNode(span); const z = document.createTextNode('\u200B'); span.after(z); const nr = document.createRange(); nr.setStartAfter(z); nr.collapse(true); sel.removeAllRanges(); sel.addRange(nr); e.focus(); scheduleSave(); } catch (err) { console.error(err); }
         }
-        function forceCleanEditor() { const e = document.getElementById('note-editor'), p = e.innerText; e.innerHTML = p.trim() === '' ? '<div><br></div>' : p; scheduleSave(); }
+        
+        function forceCleanEditor() {
+            const sel = window.getSelection();
+            if (!sel.rangeCount) return showAlert("Obywatelu! Najpierw kliknij na zakreślony tekst.");
+            
+            const editor = document.getElementById('note-editor');
+            if (!editor.contains(sel.anchorNode)) return;
+
+            let node = sel.anchorNode;
+            let removed = false;
+
+            while (node && node !== editor) {
+                if (node.nodeType === 1 && node.classList.contains('marked')) {
+                    const parent = node.parentNode;
+                    while (node.firstChild) parent.insertBefore(node.firstChild, node);
+                    parent.removeChild(node);
+                    removed = true;
+                    break;
+                }
+                node = node.parentNode;
+            }
+
+            if (!removed && !sel.isCollapsed) {
+                const spans = editor.querySelectorAll('span.marked');
+                spans.forEach(span => {
+                    if (sel.containsNode(span, true)) {
+                        const parent = span.parentNode;
+                        while (span.firstChild) parent.insertBefore(span.firstChild, span);
+                        parent.removeChild(span);
+                        removed = true;
+                    }
+                });
+            }
+
+            if (removed) {
+                editor.normalize();
+                scheduleSave();
+            } else {
+                showAlert("Obywatelu! W tym miejscu nie ma przydzielonego zakreślacza.");
+            }
+        }
+        
         function viewNoteInternal(id) {
             const n = state.notes.find(x => x.id === id); if (!n) return;
             document.getElementById('viewer-date').innerText = n.date; document.getElementById('viewer-title').innerText = n.title || 'NOTATKA SŁUŻBOWA';
