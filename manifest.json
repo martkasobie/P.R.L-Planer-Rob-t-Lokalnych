@@ -1,7 +1,7 @@
 {
   "name": "P.R.L - Planer Robót Lokalnych",
-  "short_name": "Planer Robót Lokalnych",
-  "start_url": "index.html",
+  "short_name": "Planer P.R.L",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#262626",
   "theme_color": "#8c1c1c",
@@ -17,7 +17,7 @@
       "src": "icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any"
+      "purpose": "any maskable"
     }
   ]
 }
