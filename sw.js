@@ -1,4 +1,19 @@
-const CACHE_NAME = 'prl-planer-v5';
+importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js');
+
+// Konfiguracja Centrali
+firebase.initializeApp({
+  apiKey: "AIzaSyBp7RWF-GWZ0-AuGAjwyI5x0FecuzzODec",
+  authDomain: "planer-robot-lokalnych.firebaseapp.com",
+  projectId: "planer-robot-lokalnych",
+  storageBucket: "planer-robot-lokalnych.firebasestorage.app",
+  messagingSenderId: "807809303313",
+  appId: "1:807809303313:web:b6d84d65f14a0ec60902b0"
+});
+
+const messaging = firebase.messaging();
+
+const CACHE_NAME = 'prl-planer-v6';
 
 const ASSETS_TO_CACHE = [
   './',
@@ -30,7 +45,7 @@ const ASSETS_TO_CACHE = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('Obywatelu! Archiwizuję nowe akta, ikonę i pieczątki w pamięci urządzenia...');
+      console.log('Obywatelu! Archiwizuję akta (v6) w pamięci urządzenia...');
       return cache.addAll(ASSETS_TO_CACHE);
     })
   );
@@ -58,58 +73,44 @@ self.addEventListener('fetch', (event) => {
     caches.match(event.request).then((cachedResponse) => {
       const fetchPromise = fetch(event.request).then((networkResponse) => {
         caches.open(CACHE_NAME).then((cache) => {
-          if (event.request.url.startsWith('http')) {
+          if (event.request.url.startsWith('http') && !event.request.url.includes('firestore')) {
             cache.put(event.request, networkResponse.clone());
           }
         });
         return networkResponse;
-      }).catch(() => {
-        // Zignoruj błędy sieci w trybie offline
-      });
-      
+      }).catch(() => {});
       return cachedResponse || fetchPromise;
     })
   );
 });
 
-// Odbieranie dyrektyw z centrali (Push Notification Event)
-self.addEventListener('push', function(event) {
-  // Jeśli serwer prześle dane, używamy ich, inaczej dajemy domyślny komunikat
-  const data = event.data ? event.data.json() : { 
-      title: 'CENTRALNE WEZWANIE', 
-      body: 'Obywatelu, staw się do planera natychmiast!' 
-  };
-
-  const options = {
-    body: data.body,
+// Odbieranie dyrektyw, gdy aplikacja jest zamknięta
+messaging.onBackgroundMessage(function(payload) {
+  console.log('[sw.js] Otrzymano tajną dyrektywę w tle', payload);
+  
+  const notificationTitle = payload.notification.title || 'CENTRALNE WEZWANIE';
+  const notificationOptions = {
+    body: payload.notification.body,
     icon: './icon-512.png',
-    badge: './icon-512.png', // Mała ikonka na pasku
-    vibrate: [200, 100, 200, 100, 200], // Rytm alarmu
-    data: {
-      url: './index.html' // Gdzie przekierować po kliknięciu
-    }
+    badge: './icon-512.png',
+    vibrate: [200, 100, 200, 100, 200],
+    data: { url: './index.html' }
   };
 
-  event.waitUntil(
-    self.registration.showNotification(data.title, options)
-  );
+  self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
-// Reakcja Obywatela na wezwanie (Notification Click Event)
+// Co się dzieje, gdy Obywatel kliknie powiadomienie
 self.addEventListener('notificationclick', function(event) {
-  event.notification.close(); // Zamknij powiadomienie
-
-  // Otwórz aplikację, jeśli Obywatel kliknął
+  event.notification.close();
   event.waitUntil(
-    clients.matchAll({ type: 'window' }).then(windowClients => {
-      // Sprawdź, czy karta jest już otwarta, jeśli tak - przenieś na nią focus
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
       for (var i = 0; i < windowClients.length; i++) {
         var client = windowClients[i];
         if (client.url.indexOf(event.notification.data.url) !== -1 && 'focus' in client) {
           return client.focus();
         }
       }
-      // Jeśli nie ma otwartej karty, otwórz nową
       if (clients.openWindow) {
         return clients.openWindow(event.notification.data.url);
       }
