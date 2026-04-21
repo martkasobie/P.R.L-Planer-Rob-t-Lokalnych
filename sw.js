@@ -13,7 +13,7 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-const CACHE_NAME = 'prl-planer-v6';
+const CACHE_NAME = 'prl-planer-v7';
 
 const ASSETS_TO_CACHE = [
   './',
@@ -45,7 +45,7 @@ const ASSETS_TO_CACHE = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('Obywatelu! Archiwizuję akta (v6) w pamięci urządzenia...');
+      console.log('Obywatelu! Archiwizuję akta (v7) w pamięci urządzenia...');
       return cache.addAll(ASSETS_TO_CACHE);
     })
   );
@@ -72,13 +72,22 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       const fetchPromise = fetch(event.request).then((networkResponse) => {
+        // NATYCHMIASTOWE KSERO - zanim przeglądarka zdąży odczytać plik
+        const responseToCache = networkResponse.clone();
+        
         caches.open(CACHE_NAME).then((cache) => {
+          // Zapisujemy ksero w archiwum
           if (event.request.url.startsWith('http') && !event.request.url.includes('firestore')) {
-            cache.put(event.request, networkResponse.clone());
+            cache.put(event.request, responseToCache);
           }
         });
+        
+        // Zwracamy oryginał do aplikacji
         return networkResponse;
-      }).catch(() => {});
+      }).catch(() => {
+        // Zignoruj błędy sieci w trybie offline
+      });
+      
       return cachedResponse || fetchPromise;
     })
   );
