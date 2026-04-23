@@ -1,0 +1,10 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.martkasobie.planerrobtlokalnych",
+    "sha256_cert_fingerprints": [
+      "3B:E5:A0:C0:79:2C:9D:86:99:C8:71:BF:31:49:B2:F9:4C:E6:5E:44:66:62:FE:5B:C3:D0:C9:D2:E1:8C:26:15"
+    ]
+  }
+}]
