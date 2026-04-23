@@ -847,8 +847,8 @@
         };
 
         onMessage(messaging, (payload) => {
-            console.log('Wiadomość otrzymana na żywo: ', payload);
-            showAlert("NAGŁA DYREKTYWA: " + payload.notification.title + "\n\n" + payload.notification.body);
+            // Aplikacja otwarta - ignorujemy wyskakujące okienko, zachowujemy ciszę
+            console.log('Ciche odebranie dyrektywy: ', payload);
         });
     </script>
 </body>
