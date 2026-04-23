@@ -13,9 +13,8 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-const CACHE_NAME = 'prl-planer-v9'; // Podbita wersja bufora!
+const CACHE_NAME = 'prl-planer-v10'; // Wersja v10 (Naprawa błędu POST)
 
-// Twarde adresy URL, żeby system się nie gubił po kliknięciu w powiadomienie
 const APP_URL = 'https://martkasobie.github.io/P.R.L-Planer-Robot-Lokalnych/';
 const ICON_URL = 'https://martkasobie.github.io/P.R.L-Planer-Robot-Lokalnych/icon-512.png';
 
@@ -49,7 +48,7 @@ const ASSETS_TO_CACHE = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('Obywatelu! Archiwizuję akta (v9) w pamięci urządzenia...');
+      console.log('Obywatelu! Archiwizuję akta (v10) w pamięci urządzenia...');
       return cache.addAll(ASSETS_TO_CACHE);
     })
   );
@@ -73,12 +72,18 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  // URZĘDOWY ZAKAZ KSEROWANIA PACZEK TYPU POST!
+  // Przepuszczamy zapytania Firebase bezpośrednio do serwera, bez błędów.
+  if (event.request.method !== 'GET') {
+    return; 
+  }
+
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       const fetchPromise = fetch(event.request).then((networkResponse) => {
         const responseToCache = networkResponse.clone();
         caches.open(CACHE_NAME).then((cache) => {
-          if (event.request.url.startsWith('http') && !event.request.url.includes('firestore')) {
+          if (event.request.url.startsWith('http')) {
             cache.put(event.request, responseToCache);
           }
         });
@@ -93,7 +98,6 @@ self.addEventListener('fetch', (event) => {
 messaging.onBackgroundMessage(function(payload) {
   console.log('[sw.js] Otrzymano tajną dyrektywę w tle', payload);
   
-  // URZĘDOWA CENZURA: Ignorujemy twarde powiadomienia, żeby uniknąć duplikatów.
   if (payload.notification) {
       console.log('[sw.js] Firebase wyświetla to z automatu. Pasuję.');
       return;
@@ -115,7 +119,6 @@ messaging.onBackgroundMessage(function(payload) {
 self.addEventListener('notificationclick', function(event) {
   event.notification.close();
   
-  // Wymuszamy otwarcie prawidłowego, twardego adresu
   const urlToOpen = event.notification.data?.url || APP_URL;
 
   event.waitUntil(
