@@ -12,24 +12,13 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// Odbieranie w tle - Wersja Inteligentna (v14)
+// POWIADOMIENIA W TLE - WERSJA PASYWNA (v15)
+// Nie tworzymy tu własnego showNotification, żeby nie dublować Chrome'a!
 messaging.onBackgroundMessage(function(payload) {
-  console.log('Odebrano depeszę:', payload);
-
-  // Archiwista sprawdza czy wysłałaś własny tytuł i treść w Custom Data (Krok 5 w Firebase)
-  const notificationTitle = payload.data?.title || payload.notification?.title || 'SYRENA PORANNA!';
-  const notificationOptions = {
-    body: payload.data?.body || payload.notification?.body || 'Zaloguj się do Planera i zgłoś gotowość do Czynu Społecznego!',
-    icon: 'icon-512.png',
-    badge: 'icon-512.png',
-    tag: 'prl-notif', 
-    renotify: true
-  };
-
-  return self.registration.showNotification(notificationTitle, notificationOptions);
+    console.log('Depesza odebrana przez system, Chrome ją wyświetli.');
 });
 
-// ROZKAZ OSTATECZNY KLIKNIĘCIA - Otwiera aplikację, nie Chrome
+// ROZKAZ OSTATECZNY KLIKNIĘCIA
 self.addEventListener('notificationclick', function(event) {
   event.notification.close();
   
@@ -37,14 +26,14 @@ self.addEventListener('notificationclick', function(event) {
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
-      // 1. Jeśli apka jest już gdzieś otwarta, przełącz na nią
+      // 1. Jeśli apka jest otwarta, zrób focus
       for (var i = 0; i < windowClients.length; i++) {
         var client = windowClients[i];
         if (client.url === targetUrl && 'focus' in client) {
           return client.focus();
         }
       }
-      // 2. Jeśli nie jest otwarta, otwórz ją jako czyste okno aplikacji
+      // 2. Jeśli nie jest otwarta, otwórz ją
       if (clients.openWindow) {
         return clients.openWindow(targetUrl);
       }
