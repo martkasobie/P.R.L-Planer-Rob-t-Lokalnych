@@ -226,7 +226,7 @@
             <div class="viewer-header">
                 <div id="viewer-date" class="viewer-meta"></div>
                 <h1 id="viewer-title" class="viewer-title"></h1>
-                <div id="viewer-tags" class="viewer-tags"></div>
+                <div id="viewer-tags" class="viewer-tags break-words whitespace-normal"></div>
             </div>
             <div id="viewer-content" class="viewer-content selectable-text"></div>
             <div class="viewer-footer">ZARCHIWIZOWANO<br>PRZEZ: <span id="viewer-citizen"></span></div>
@@ -347,7 +347,7 @@
                              <div class="absolute inset-0 pointer-events-none opacity-5" style="background-image: repeating-linear-gradient(transparent, transparent 19px, #000 20px);"></div>
                              <div class="p-2 border-b border-gray-400 bg-gray-200/80 z-10 flex flex-col gap-1">
                                 <input type="text" id="note-title-input" placeholder="NAGŁÓWEK" class="w-full bg-transparent border-b border-gray-400 border-dashed outline-none font-bold font-['Courier_Prime'] text-sm text-[#8c1c1c] placeholder-gray-500">
-                                <textarea id="note-tags-input" rows="2" placeholder="TAGI (np. #plan #ważne)..." class="w-full bg-transparent border-none outline-none font-['Courier_Prime'] text-xs text-[#103090] placeholder-gray-500 resize-none custom-scrollbar break-words"></textarea>
+                                <textarea id="note-tags-input" rows="2" placeholder="TAGI (np. #plan #ważne)..." class="w-full bg-transparent border-none outline-none font-['Courier_Prime'] text-xs text-[#103090] placeholder-gray-500 resize-none custom-scrollbar break-all whitespace-pre-wrap"></textarea>
                              </div>
                              <div id="note-editor" contenteditable="true" oninput="scheduleSave();" onkeyup="sanitizeEditor(this);" class="flex-1 bg-transparent p-4 outline-none font-['Courier_Prime'] text-base leading-relaxed text-[#1a1a1a] z-10 custom-scrollbar prl-editor overflow-y-auto break-words whitespace-pre-wrap" placeholder="Miejsce na notatki służbowe, obserwacje i wnioski..."></div>
                              <div class="border-t border-gray-400 p-2 flex flex-wrap justify-end items-center bg-gray-200/80 z-10 gap-2">
@@ -768,7 +768,18 @@
             const s = document.getElementById('note-search'), term = s ? s.value.toLowerCase().trim() : "";
             let fn = state.notes; if (term) fn = state.notes.filter(x => (x.title && x.title.toLowerCase().includes(term)) || (x.content && x.content.toLowerCase().includes(term)) || (x.tags && x.tags.toLowerCase().includes(term)) || (x.date && x.date.toLowerCase().includes(term)));
             if (!fn || fn.length === 0) l.innerHTML = '<li class="text-center text-gray-500 italic p-2">Brak akt w archiwum.</li>';
-            else fn.forEach(x => { const li = document.createElement('li'); li.className = `archive-item flex items-center gap-2 ${state.activeNoteId === x.id ? 'active' : ''}`; li.innerHTML = `<input type="checkbox" class="note-checkbox cursor-pointer accent-[#8c1c1c]" value="${x.id}" onclick="event.stopPropagation()"><div class="truncate flex-1 cursor-pointer" onclick="viewNoteInternal(${x.id})"><div class="font-bold text-[#8c1c1c]">${x.title || 'Bez tytułu'}</div><div class="text-[9px] text-gray-600 mt-0.5">${x.date} ${x.tags ? `<span class="text-[#103090] font-bold ml-1">${x.tags}</span>` : ''}</div></div><button onclick="event.stopPropagation(); loadNoteForEdit(${x.id})" class="text-[9px] bg-[#292524] text-white px-2 py-1 hover:bg-black font-bold border border-gray-600 uppercase">EDYTUJ</button>`; l.appendChild(li); });
+            else fn.forEach(x => { 
+                const li = document.createElement('li'); 
+                li.className = `archive-item flex items-center gap-2 ${state.activeNoteId === x.id ? 'active' : ''}`; 
+                li.innerHTML = `
+                <input type="checkbox" class="note-checkbox cursor-pointer accent-[#8c1c1c] shrink-0" value="${x.id}" onclick="event.stopPropagation()">
+                <div class="min-w-0 flex-1 cursor-pointer" onclick="viewNoteInternal(${x.id})">
+                    <div class="font-bold text-[#8c1c1c] truncate">${x.title || 'Bez tytułu'}</div>
+                    <div class="text-[9px] text-gray-600 mt-0.5 break-words whitespace-normal leading-tight">${x.date} ${x.tags ? `<span class="text-[#103090] font-bold ml-1 break-words">${x.tags}</span>` : ''}</div>
+                </div>
+                <button onclick="event.stopPropagation(); loadNoteForEdit(${x.id})" class="text-[9px] bg-[#292524] text-white px-2 py-1 hover:bg-black font-bold border border-gray-600 uppercase shrink-0">EDYTUJ</button>`; 
+                l.appendChild(li); 
+            });
             const cb = document.getElementById('btn-cancel-edit'); if(cb) cb.classList.toggle('hidden', !state.activeNoteId);
         }
         function clearEditor() { state.activeNoteId = null; const ed = document.getElementById('note-editor'), t = document.getElementById('note-title-input'), tg = document.getElementById('note-tags-input'); if(ed) ed.innerHTML = state.scratchpad || '<div><br></div>'; if(t) t.value = state.scratchpadTitle || ''; if(tg) tg.value = state.scratchpadTags || ''; saveState(); renderNotesList(); }
