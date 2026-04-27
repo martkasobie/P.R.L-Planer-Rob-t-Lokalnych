@@ -1,4 +1,4 @@
-const SW_VERSION = 'v1'; // <--- TUTAJ ZMIENIAJ NUMEREK PRZY KAŻDEJ AKTUALIZACJI APLIKACJI
+const SW_VERSION = 'v17'; // <--- PODBILIŚMY NA v17, ABY WYMUSIĆ AKTUALIZACJĘ Z v16
 
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js');
@@ -24,7 +24,7 @@ messaging.onBackgroundMessage(function(payload) {
     body: payload.data?.body || payload.notification?.body || 'Zgłoś gotowość do Czynu Społecznego!',
     icon: 'icon-512.png',
     badge: 'icon-512.png',
-    tag: 'prl-notif', // Zapobiega nadmiernemu spamowaniu
+    tag: 'prl-notif', 
     renotify: true
   };
 
@@ -33,22 +33,18 @@ messaging.onBackgroundMessage(function(payload) {
 
 // 2. OBSŁUGA KLIKNIĘCIA - Wymuszamy otwarcie aplikacji
 self.addEventListener('notificationclick', function(event) {
-  // Zamykamy powiadomienie po kliknięciu
   event.notification.close();
   
-  // Adres Twojej aplikacji (identyczny jak ten zainstalowany w telefonie)
   const targetUrl = 'https://martkasobie.github.io/P.R.L-Planer-Robot-Lokalnych/';
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
-      // Jeśli aplikacja jest już otwarta w tle, przełączamy na nią (focus)
       for (var i = 0; i < windowClients.length; i++) {
         var client = windowClients[i];
         if (client.url === targetUrl && 'focus' in client) {
           return client.focus();
         }
       }
-      // Jeśli aplikacja jest zamknięta, otwieramy ją jako nowe okno
       if (clients.openWindow) {
         return clients.openWindow(targetUrl);
       }
