@@ -1,4 +1,4 @@
-const SW_VERSION = 'v20'; // <--- WERSJA 18: Ostateczna pacyfikacja marginesów!
+const SW_VERSION = 'v21'; // <--- WERSJA 21: Moduł Statystyki i Analityki Włączony!
 
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js');
